@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Number Resolver</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+
+            /* make it behave like bootstrap container */
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 20px;
+        }
+
+        #inputs {
+            margin-bottom: 20px;
+        }
+
+        #results p {
+            margin: 5px 0;
+        }
+
+        #results {
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div id="inputs">
+        <label for="numberToText">Enter Number to translate to correct words:</label>
+        <input type="text" id="numberToText" value="7399" pattern="[0-9 ]*" />
+        <button id="translateButton">Translate</button>
+    </div>
+    <div id="results">
+    </div>
+    <script>
+        const numberMapping = {
+            '2': ['A', 'B', 'C'],
+            '3': ['D', 'E', 'F'],
+            '4': ['G', 'H', 'I'],
+            '5': ['J', 'K', 'L'],
+            '6': ['M', 'N', 'O'],
+            '7': ['P', 'Q', 'R', 'S'],
+            '8': ['T', 'U', 'V'],
+            '9': ['W', 'X', 'Y', 'Z'],
+            '0': [' ']
+        };
+
+        const resultsDiv = document.getElementById('results');
+
+        const clearResults = () => {
+            resultsDiv.innerHTML = '';
+        };
+
+        const translate = () => {
+            clearResults();
+            const input = document.getElementById('numberToText').value;
+            const digits = input.split('').filter(d => d in numberMapping);
+            if (digits.length === 0) {
+                resultsDiv.innerHTML = '<p>No valid digits entered.</p>';
+                return;
+            }
+
+            const generateCombinations = (index, current) => {
+                if (index === digits.length) {
+                    const p = document.createElement('p');
+                    p.textContent = current;
+                    resultsDiv.appendChild(p);
+                    return;
+                }
+                const letters = numberMapping[digits[index]];
+                for (const letter of letters) {
+                    generateCombinations(index + 1, current + letter);
+                }
+            };
+
+            generateCombinations(0, '');
+        };
+
+        document.getElementById('translateButton').addEventListener('click', translate);
+
+        window.onload = translate;
+    </script>
+</body>
+</html>
