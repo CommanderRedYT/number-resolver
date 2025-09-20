@@ -14,15 +14,15 @@
             padding: 20px;
         }
 
-        #inputs {
+        .inputs {
             margin-bottom: 20px;
         }
 
-        #results p {
+        .results p {
             margin: 5px 0;
         }
 
-        #results {
+        .results {
             display: flex;
             flex-direction: column;
             flex-wrap: wrap;
@@ -30,63 +30,156 @@
             gap: 5px;
             font-family: monospace;
         }
+
+        .result-item {
+            padding: 2px 5px;
+        }
+
+        .group {
+            margin-bottom: 40px;
+        }
     </style>
 </head>
 <body>
-    <div id="inputs">
+<div id="number-to-text-group" class="group">
+    <div id="number-inputs" class="inputs">
         <label for="numberToText">Enter Number to translate to correct words:</label>
-        <input type="text" id="numberToText" value="7399" pattern="[0-9 ]*" />
-        <button id="translateButton">Translate</button>
+        <input type="text" id="numberToText" value="7399" pattern="[0-9 ]*"/>
+        <button id="translateNumberButton">Translate</button>
     </div>
-    <div id="results">
+    <div id="text-results" class="results">
     </div>
-    <script>
-        const numberMapping = {
-            '2': ['A', 'B', 'C'],
-            '3': ['D', 'E', 'F'],
-            '4': ['G', 'H', 'I'],
-            '5': ['J', 'K', 'L'],
-            '6': ['M', 'N', 'O'],
-            '7': ['P', 'Q', 'R', 'S'],
-            '8': ['T', 'U', 'V'],
-            '9': ['W', 'X', 'Y', 'Z'],
-            '0': [' ']
-        };
+</div>
+<div id="text-to-number-group" class="group">
+    <div id="text-inputs" class="inputs">
+        <label for="textToNumber">Enter Text to translate to numbers:</label>
+        <input type="text" id="textToNumber" value="REW" pattern="[A-Za-z ]*"/>
+        <button id="translateTextButton">Translate</button>
+    </div>
+    <div id="number-results" class="results">
+    </div>
+</div>
+<script>
+    const numberMapping = {
+        '2': ['A', 'B', 'C'],
+        '3': ['D', 'E', 'F'],
+        '4': ['G', 'H', 'I'],
+        '5': ['J', 'K', 'L'],
+        '6': ['M', 'N', 'O'],
+        '7': ['P', 'Q', 'R', 'S'],
+        '8': ['T', 'U', 'V'],
+        '9': ['W', 'X', 'Y', 'Z'],
+        '0': [' ']
+    };
 
-        const resultsDiv = document.getElementById('results');
+    const textResultsDiv = document.getElementById('text-results');
+    const numberResultsDiv = document.getElementById('number-results');
 
-        const clearResults = () => {
-            resultsDiv.innerHTML = '';
-        };
+    const clearTextResults = () => {
+        textResultsDiv.innerHTML = '';
+    };
 
-        const translate = () => {
-            clearResults();
-            const input = document.getElementById('numberToText').value;
-            const digits = input.split('').filter(d => d in numberMapping);
-            if (digits.length === 0) {
-                resultsDiv.innerHTML = '<p>No valid digits entered.</p>';
+    const clearNumberResults = () => {
+        numberResultsDiv.innerHTML = '';
+    };
+
+    const translateNumberToText = () => {
+        clearTextResults();
+        const input = document.getElementById('numberToText').value;
+        const digits = input.split('').filter(d => d in numberMapping);
+        if (digits.length === 0) {
+            textResultsDiv.innerHTML = '<p>No valid digits entered.</p>';
+            return;
+        }
+
+        const generateCombinations = (index, current) => {
+            if (index === digits.length) {
+                const p = document.createElement('p');
+                p.classList.add('result-item');
+                p.textContent = current;
+                textResultsDiv.appendChild(p);
                 return;
             }
-
-            const generateCombinations = (index, current) => {
-                if (index === digits.length) {
-                    const p = document.createElement('p');
-                    p.textContent = current;
-                    resultsDiv.appendChild(p);
-                    return;
-                }
-                const letters = numberMapping[digits[index]];
-                for (const letter of letters) {
-                    generateCombinations(index + 1, current + letter);
-                }
-            };
-
-            generateCombinations(0, '');
+            const letters = numberMapping[digits[index]];
+            for (const letter of letters) {
+                generateCombinations(index + 1, current + letter);
+            }
         };
 
-        document.getElementById('translateButton').addEventListener('click', translate);
+        generateCombinations(0, '');
 
-        window.onload = translate;
-    </script>
+        // now highlight all the actual words
+        // https://api.dictionaryapi.dev/api/v2/entries/en/<word>. if 404, its not a word. otherwise it is. make others dark grey that are not words
+        const resultItems = document.querySelectorAll('.result-item');
+
+        let tooManyRequests = 0;
+
+        const check = async () => {
+            for await (const item of resultItems) {
+                const word = item.textContent.toLowerCase();
+
+                try {
+                    const response = await fetch(`https://freedictionaryapi.com/api/v1/entries/en/${word}`);
+
+                    const responseJson = await response.json();
+
+                    if ('entries' in responseJson && responseJson.entries.length > 0) {
+                        item.style.color = 'white'; // valid word
+                        item.style.backgroundColor = 'green';
+                        item.style.borderRadius = '5px';
+                        item.style.border = '1px solid darkgreen';
+                    } else {
+                        item.style.color = 'darkgrey'; // not a valid word
+                    }
+
+                    // if too many requests, log to console and stop
+                    if (response.status === 429) {
+                        tooManyRequests++;
+                        if (tooManyRequests > 3) break; // stop after 3 too many
+                        console.error('Too many requests, stopping further checks.');
+                        await new Promise(r => setTimeout(r, 5000)); // wait 5 seconds before continuing
+                        continue;
+                    }
+                } catch (e) {
+                    console.error('Error fetching word:', e);
+                    item.style.color = 'red';
+                }
+
+                await new Promise(r => setTimeout(r, 25)); // rate limit to 2 requests per second
+            }
+        };
+
+        check();
+    };
+
+    const translateTextToNumber = () => {
+        clearNumberResults();
+        const input = document.getElementById('textToNumber').value.toUpperCase();
+        const letters = input.split('').filter(c => /[A-Z ]/.test(c));
+        if (letters.length === 0) {
+            numberResultsDiv.innerHTML = '<p>No valid letters entered.</p>';
+            return;
+        }
+
+        const getNumberForLetter = (letter) => {
+            for (const [number, chars] of Object.entries(numberMapping)) {
+                if (chars.includes(letter)) {
+                    return number;
+                }
+            }
+            return '';
+        };
+
+        const numberString = letters.map(getNumberForLetter).join('');
+        const p = document.createElement('p');
+        p.textContent = numberString;
+        numberResultsDiv.appendChild(p);
+    };
+
+    document.getElementById('translateNumberButton').addEventListener('click', translateNumberToText);
+    document.getElementById('translateTextButton').addEventListener('click', translateTextToNumber);
+
+    window.onload = translateNumberToText;
+</script>
 </body>
 </html>
